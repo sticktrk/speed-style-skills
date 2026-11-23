@@ -104,14 +104,11 @@ export async function pull(folder, id, api) {
     if (error.code !== 'ENOENT') throw error;
   });
   if (exists) {
-    if (
-      exists.isDirectory() &&
-      (await localInfo(folder).then(
-        (info) => info.id === id && info.origin === api.origin,
-        () => false,
-      ))
-    )
+    const info = exists.isDirectory() ? await localInfo(folder).catch(() => null) : null;
+    if (info?.id === id && info.origin === api.origin) {
+      await api.remember?.(id, info.viewReceipt);
       return folder;
+    }
     throw Error('Choose a new folder. This one already contains other work.');
   }
   const { concept, viewReceipt } = await api.manifest(id);
@@ -152,6 +149,7 @@ export async function pull(folder, id, api) {
       originals: Object.fromEntries(originals),
     });
     await rename(temp, folder);
+    await api.remember?.(id, viewReceipt);
     return folder;
   } finally {
     await rm(temp, { recursive: true, force: true });

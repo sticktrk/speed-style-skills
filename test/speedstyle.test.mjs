@@ -290,3 +290,23 @@ test('a maximum-size edited approval has no duration cap; ordinary requests rema
   await client.approval(id, { files, viewReceipt: 'viewed', baseRevision: revision });
   assert.ok(capturedBytes > 33 * 1024 * 1024);
 });
+
+test('sign-in carries the concept opened from its link, and only for the same service', async (t) => {
+  const f = await fixture(t);
+  const sent = () => f.calls.findLast((call) => call.url.endsWith('/auth/code')).body;
+  await f.api.sendCode('me@example.test');
+  assert.deepEqual(sent(), { email: 'me@example.test' });
+  await pull(f.folder, id, f.api);
+  await f.api.sendCode('me@example.test');
+  assert.deepEqual(sent(), { email: 'me@example.test', conceptId: id, viewReceipt: 'viewed' });
+  const elsewhere = customerClient({
+    origin: 'https://other.example',
+    site,
+    state: f.state,
+    fetcher: async (url, init) => {
+      assert.deepEqual(JSON.parse(init.body), { email: 'me@example.test' });
+      return json({ challengeId: 'two' });
+    },
+  });
+  await elsewhere.sendCode('me@example.test');
+});

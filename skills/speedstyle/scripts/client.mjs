@@ -63,6 +63,7 @@ export function customerClient({
 } = {}) {
   const credentials = join(state, 'account.json');
   const challenge = join(state, 'code.json');
+  const opened = join(state, 'concept.json');
   async function signedIn() {
     const auth = await readSaved(credentials);
     if (
@@ -155,7 +156,14 @@ export function customerClient({
   async function sendCode(email) {
     email = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Error('Enter the email you used in the quiz.');
-    const result = await request('/auth/code', { body: { email } });
+    // The last concept opened from its link goes with the request. The service
+    // then sends a first sign-in code even after the limit for a new address is used.
+    const seen = await readSaved(opened).catch(() => null);
+    const concept =
+      seen?.origin === origin && uuid.test(seen.id) && typeof seen.viewReceipt === 'string'
+        ? { conceptId: seen.id, viewReceipt: seen.viewReceipt }
+        : {};
+    const result = await request('/auth/code', { body: { email, ...concept } });
     if (typeof result.challengeId !== 'string' || !result.challengeId)
       throw Error('Please request a fresh code.');
     await savePrivate(challenge, { origin, email, challengeId: result.challengeId });
@@ -228,6 +236,10 @@ export function customerClient({
     },
     mine: () => request('/mine', { authenticated: true, jsonLimit: 16 * 1024 * 1024 }),
     manifest: (id) => request('/' + id),
+    // Called once a concept is safely in its folder. Sign-in then carries it;
+    // opening a concept never depends on this record.
+    remember: (id, viewReceipt) =>
+      savePrivate(opened, { origin, id, viewReceipt }).catch(() => {}),
     file: (id, path, size) =>
       request('/' + id + '/files/' + path.split('/').map(encodeURIComponent).join('/'), { bytes: size }),
     approval: (id, body) =>

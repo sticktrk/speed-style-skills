@@ -6,14 +6,14 @@ Use your AI tool to open the brand concept from your Speed Styles quiz. Ask it t
 
 In Claude Code, the **Code** tab of Claude Desktop with a local project, Codex, or Cursor, paste this line into a chat with access to a local folder.
 
-> Install the speedstyle skill from https://github.com/sticktrk/brand-design-skills in my AI tool, then set me up for Speed Styles.
+> Install the speedstyle skill from https://github.com/sticktrk/speed-style-skills in my AI tool, then set me up for Speed Styles.
 
 Your tool opens a sign-in window on your computer. Use the address you gave in the quiz and the six-digit code from your email. You can sign in while your concept is being made.
 
 If your tool asks for an install command, use the following line. The installer needs Node.js 22.20 or later. Pick the AI tool you use when prompted. You can also ask your tool to copy the `skills/speedstyle` folder into its personal skills folder and run its helper with Node.js 22 or later.
 
 ```sh
-npx skills add sticktrk/brand-design-skills --skill speedstyle -g
+npx skills add sticktrk/speed-style-skills --skill speedstyle -g
 ```
 
 ## Open and edit your concept

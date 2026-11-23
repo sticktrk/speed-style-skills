@@ -6,6 +6,7 @@ Run `node scripts/speedstyle.mjs` from the installed skill directory with one of
 | --- | --- |
 | Sign in | `signin` opens a private window on this computer for the email and code. Leave the command running until the window says sign-in succeeded. If the browser does not open, give the customer the printed local address. An existing sign-in returns immediately. |
 | Sign in on a different computer | `code EMAIL` sends a code. Run `verify` in a private terminal the customer controls. They enter the digits at its hidden prompt. Never pass the digits as an argument or ask for them in chat. The customer can choose which computer checks the email. |
+| Sign-in asks the customer to wait | Leave a minute between code requests. If it still refuses and the customer has their ready email, run `pull LINK` with its viewing link, then sign in again. A concept opened from its link lets a first sign-in through after the limit for a new address is used. |
 | Switch accounts | `signout` followed by `signin`. |
 | Check on a concept | `status` lists concepts for the signed-in address and indicates whether another is being made. If the list is empty and pending is false, check the quiz email or the ready link. |
 | Download | `pull` chooses the only available open concept. `pull LINK` or `pull ID` chooses a specific concept. The helper prints its folder. An optional last argument gives a preferred new folder. An existing folder for that concept is reused with all edits intact. |
