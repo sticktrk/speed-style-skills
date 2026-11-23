@@ -22,6 +22,7 @@ const privateName = '.speedstyle';
 export const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const digest = /^[a-f0-9]{64}$/;
 export const hash = (value) => createHash('sha256').update(value).digest('hex');
+const label = (path) => JSON.stringify(String(path).slice(0, 240));
 const textual = (path) => /\.(html|css|json|svg)$/i.test(path);
 
 export function safePath(path) {
@@ -47,7 +48,7 @@ function checkFileList(files) {
   for (const file of files) {
     const path = file.path;
     if (!safePath(path) || !types.has(extname(path).toLowerCase()))
-      throw Error('The concept contains an unsupported file name or type.');
+      throw Error('The concept contains an unsupported file name or type: ' + label(path));
     const parts = path.split('/');
     for (let index = 0; index < parts.length; index++) {
       const name = parts.slice(0, index + 1).join('/');
@@ -55,7 +56,7 @@ function checkFileList(files) {
       const isFile = index + 1 === parts.length;
       const prior = names.get(key);
       if (prior && (prior.name !== name || prior.isFile || isFile))
-        throw Error('Two file or folder names in this concept overlap.');
+        throw Error('This file or folder name overlaps another: ' + label(path));
       names.set(key, { name, isFile });
     }
     paths.add(path);
@@ -65,7 +66,7 @@ function checkFileList(files) {
       file.size < 0 ||
       file.size > maxFile
     )
-      throw Error('A concept file is too large or has an invalid description.');
+      throw Error('This file is too large or has an invalid description: ' + label(path));
     size += file.size;
   }
   if (size > maxTotal) throw Error('Keep the concept under 25 MiB.');
@@ -158,7 +159,8 @@ export async function pull(folder, id, api) {
 }
 
 export async function localFile(folder, path) {
-  if (!safePath(path) || !types.has(extname(path).toLowerCase())) throw Error('Unsupported file.');
+  if (!safePath(path) || !types.has(extname(path).toLowerCase()))
+    throw Error('Unsupported file name or type: ' + label(path));
   // Check every component before opening. Never follow a linked folder to a file outside this concept.
   for (let parent = dirname(path); parent !== '.'; parent = dirname(parent)) {
     if (!(await lstat(join(folder, parent))).isDirectory())
@@ -171,7 +173,7 @@ export async function localFile(folder, path) {
   try {
     const stat = await file.stat();
     if (!stat.isFile() || stat.nlink !== 1 || stat.size > maxFile)
-      throw Error('Use ordinary files under 8 MiB inside your concept folder.');
+      throw Error('Use an ordinary file under 8 MiB for ' + label(path));
     return await file.readFile();
   } finally {
     await file.close();
@@ -184,18 +186,15 @@ export async function review(folder) {
   let total = 0;
   async function walk(parent) {
     for (const entry of await readdir(join(folder, parent), { withFileTypes: true })) {
-      if (!parent && (entry.name === privateName || entry.name === '.DS_Store')) continue;
-      if (entry.name === '.DS_Store' && entry.isFile()) continue;
+      if (entry.name.startsWith('.')) continue;
       const path = parent ? parent + '/' + entry.name : entry.name;
       if (!safePath(path) || entry.isSymbolicLink())
-        throw Error(
-          'Move hidden files, links or unsupported names outside your concept folder before approval.',
-        );
+        throw Error('Move this link or unsupported name outside your concept folder: ' + label(path));
       if (entry.isDirectory()) {
         await walk(path);
         continue;
       }
-      if (!entry.isFile()) throw Error('Only ordinary files belong in this folder.');
+      if (!entry.isFile()) throw Error('Use an ordinary file for ' + label(path));
       const bytes = await localFile(folder, path);
       total += bytes.length;
       if (total > maxTotal || files.length >= 300)

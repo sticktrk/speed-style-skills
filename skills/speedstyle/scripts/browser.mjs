@@ -83,11 +83,12 @@ function escapeHtml(value) {
 
 export function signInBrowser(api, options) {
   let step = 'email';
+  const codeHelp = 'If your email matches the quiz, check your inbox and spam folder for a six-digit code. Use Change email to correct the address or request a fresh code.';
   function page(res, notice, status = 200) {
     const field =
       step === 'email'
         ? '<label>Quiz email <input type="email" name="email" autocomplete="email" required autofocus></label> <button>Send code</button>'
-        : '<label>Email code <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required autofocus></label> <button>Sign in</button>';
+        : '<label>Email code <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required autofocus></label> <button>Sign in</button> <button name="changeEmail" value="1" formnovalidate>Change email</button>';
     res
       .writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' })
       .end(
@@ -113,7 +114,7 @@ export function signInBrowser(api, options) {
           res,
           step === 'email'
             ? 'Use the address you gave in the quiz.'
-            : 'Enter the six digits we emailed you.',
+            : codeHelp,
         );
         return;
       }
@@ -140,7 +141,10 @@ export function signInBrowser(api, options) {
         if (step === 'email') {
           await api.sendCode(form.get('email') || '');
           step = 'code';
-          page(res, 'Enter the six digits we emailed you.');
+          page(res, codeHelp);
+        } else if (step === 'code' && form.has('changeEmail')) {
+          step = 'email';
+          page(res,'Enter the address you used for your quiz.');
         } else if (step === 'code') {
           await api.verifyCode(form.get('code') || '');
           step = 'done';

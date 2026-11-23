@@ -24,8 +24,8 @@ Try **“Make the green a little darker everywhere”** or **“Change the tagli
 
 ## Approve and start your trial
 
-Say **“I’m happy with this. Approve it.”** Your tool shows you the changes and asks you to confirm. Approval sends the files you reviewed and starts work on your full Design System.
+Say **“I’m happy with this. Approve it.”** Your tool shows you the changes and asks you to confirm. Approval sends the files you reviewed and starts work on your full brand kit.
 
-We’ll email you when your Design System is ready. Your 14-day trial starts at delivery. The email includes your system and the link to keep it. You can also ask **“What now?”** to find your brand guide.
+We’ll email you when your brand kit is ready. Your 14-day trial starts at delivery. The email includes your kit and the link to keep it. You can also ask **“What now?”** to find your brand guide.
 
 [About the skills installer](https://github.com/vercel-labs/skills)

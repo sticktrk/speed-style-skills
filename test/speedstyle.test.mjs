@@ -82,6 +82,8 @@ async function fixture(t) {
             expiresAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
           })
         : json({}, 403);
+    if (route === '/auth/logout')
+      return auth === 'Bearer example-access' ? json({ revoked: true }) : json({}, 401);
     if (route === '/mine')
       return auth === 'Bearer example-access'
         ? json({ concepts: [manifest], pending: false })
@@ -183,7 +185,7 @@ test('an interrupted or corrupt pull leaves the destination empty and a subseque
   assert.deepEqual(await readdir(f.top), []);
   await pull(f.folder, id, f.api);
   await symlink(join(f.top, 'account'), join(f.folder, 'account.json'));
-  await assert.rejects(review(f.folder), /hidden files, links/);
+  await assert.rejects(review(f.folder), /link.+account\.json/);
 });
 
 test('an unsupported file list cannot write outside the download; existing folders are left intact', async (t) => {
@@ -218,6 +220,9 @@ test('the sign-in window keeps the code in the browser and saves a reusable priv
   await reopened.mine();
   await reopened.signOut();
   assert.equal(await reopened.signedIn(), null);
+  assert.ok(
+    f.calls.some((call) => call.url.endsWith('/auth/logout') && call.auth === 'Bearer example-access'),
+  );
 });
 
 test('artwork sends only the authorized note and contact details; preview links cannot set the sign-in destination', async (t) => {
@@ -242,4 +247,46 @@ test('artwork sends only the authorized note and contact details; preview links 
     message: 'Could we try a photograph of the bike?\n\nMy concept: ' + viewUrl,
   });
   assert.equal(note.auth, undefined);
+});
+
+test('hidden local extras remain private and the helper names unsupported visible files', async (t) => {
+  const f = await fixture(t);
+  await pull(f.folder, id, f.api);
+  await mkdir(join(f.folder, '.editor'));
+  await writeFile(join(f.folder, '.editor', 'private.json'), 'private');
+  await symlink(f.top, join(f.folder, '.editor-link'));
+  await writeFile(join(f.folder, 'pieces', '.DS_Store'), 'settings');
+  const { files, changes } = await review(f.folder);
+  assert.deepEqual(changes, []);
+  assert.ok(files.every((file) => !file.path.split('/').some((part) => part.startsWith('.'))));
+  await writeFile(join(f.folder, 'pieces', 'notes.txt'), 'read me');
+  await assert.rejects(review(f.folder), /Unsupported file name or type: "pieces\/notes\.txt"/);
+});
+
+test('a maximum-size edited approval has no duration cap; ordinary requests remain bounded', async (t) => {
+  const f = await fixture(t);
+  await f.login();
+  let capturedBytes;
+  const client = customerClient({
+    origin: apiOrigin,
+    site,
+    state: f.state,
+    fetcher: async (url, init) => {
+      if (url.endsWith('/approval')) {
+        assert.equal(init.signal, undefined);
+        capturedBytes = Buffer.byteLength(init.body);
+        return json({ concept: { state: 'approved' } });
+      }
+      assert.ok(init.signal instanceof AbortSignal);
+      return f.fetcher(url, init);
+    },
+  });
+  await client.mine();
+  const files = [8, 8, 8, 1].map((mib, i) => ({
+    path: i + '.webp',
+    encoding: 'base64',
+    content: Buffer.alloc(mib * 1024 * 1024).toString('base64'),
+  }));
+  await client.approval(id, { files, viewReceipt: 'viewed', baseRevision: revision });
+  assert.ok(capturedBytes > 33 * 1024 * 1024);
 });

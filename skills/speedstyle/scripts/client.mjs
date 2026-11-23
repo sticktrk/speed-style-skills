@@ -33,11 +33,14 @@ async function bounded(response, limit) {
 async function checked(response) {
   if (!response.ok) {
     await response.body?.cancel();
-    throw Error(
-      statusHelp[response.status] ||
-        'Speed Styles could not finish this request (' +
-          response.status +
-          '). Your local files are safe.',
+    throw Object.assign(
+      new Error(
+        statusHelp[response.status] ||
+          'Speed Styles could not finish this request (' +
+            response.status +
+            '). Your local files are safe.',
+      ),
+      { status: response.status },
     );
   }
   return response;
@@ -79,7 +82,7 @@ export function customerClient({
   }
   async function request(
     path,
-    { body, authenticated = false, bytes, jsonLimit = 2 * 1024 * 1024 } = {},
+    { body, authenticated = false, bytes, jsonLimit = 2 * 1024 * 1024, editedUpload = false } = {},
   ) {
     const headers = { ...versionHeader };
     if (authenticated) headers.Authorization = 'Bearer ' + (await current()).accessToken;
@@ -89,7 +92,8 @@ export function customerClient({
       headers,
       redirect: 'error',
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(90_000),
+      // An edited approval may send 25 MiB of files over a slow connection.
+      ...(editedUpload ? {} : { signal: AbortSignal.timeout(90_000) }),
     });
     if (response.status === 401 && authenticated) await rm(credentials, { force: true });
     const data = await bounded(await checked(response), bytes ?? jsonLimit);
@@ -212,11 +216,25 @@ export function customerClient({
     sendCode,
     verifyCode,
     artwork,
-    signOut: () => Promise.all([credentials, challenge].map((path) => rm(path, { force: true }))),
+    async signOut() {
+      if (await signedIn()) {
+        try {
+          await request('/auth/logout', { authenticated: true, body: {} });
+        } catch (error) {
+          if (error.status !== 401) throw error;
+        }
+      }
+      await Promise.all([credentials, challenge].map((path) => rm(path, { force: true })));
+    },
     mine: () => request('/mine', { authenticated: true, jsonLimit: 16 * 1024 * 1024 }),
     manifest: (id) => request('/' + id),
     file: (id, path, size) =>
       request('/' + id + '/files/' + path.split('/').map(encodeURIComponent).join('/'), { bytes: size }),
-    approval: (id, body) => request('/' + id + '/approval', { body, authenticated: true }),
+    approval: (id, body) =>
+      request('/' + id + '/approval', {
+        body,
+        authenticated: true,
+        editedUpload: Array.isArray(body.files),
+      }),
   };
 }
