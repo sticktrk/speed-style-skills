@@ -28,7 +28,7 @@ async function localServer(handler, { openBrowser = true, timeout } = {}) {
       return;
     }
     try {
-      await handler(req, res, req.url.slice(prefix.length), origin, server);
+      await handler(req, res, req.url.slice(prefix.length), origin, server, prefix);
     } catch {
       if (!res.headersSent) res.writeHead(400, { 'Content-Type': 'text/plain' });
       res.end('Please open the local link again.');
@@ -51,7 +51,7 @@ async function localServer(handler, { openBrowser = true, timeout } = {}) {
 
 export async function preview(folder, options) {
   await localInfo(folder);
-  return localServer(async (req, res, raw) => {
+  return localServer(async (req, res, raw, origin, _server, prefix) => {
     if (!['GET', 'HEAD'].includes(req.method)) {
       res.writeHead(405).end();
       return;
@@ -62,10 +62,12 @@ export async function preview(folder, options) {
       res.writeHead(404).end();
       return;
     }
+    const base = origin + prefix;
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-src 'self'; frame-ancestors 'self'; form-action 'none'; base-uri 'none'; sandbox allow-same-origin",
+      `sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline' ${base}; img-src ${base}; font-src ${base}; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'`,
     );
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res
       .writeHead(200, { 'Content-Type': types.get(extname(path).toLowerCase()) })
       .end(req.method === 'HEAD' ? undefined : bytes);
